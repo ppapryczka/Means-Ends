@@ -1,13 +1,24 @@
+/* Lists for testing purpose: */
 initList([on(b1, p1), on(b2, b1), on(b3, p2), on(b4, p4), clear(b2), clear(b3), clear(p3), clear(b4)]).
-goalsList([on(b4, b3)]).
+/*goalsList([clear(b1)]).*/ /* Case: one field clear. */
+/*goalsList([on(b4, b3)]).*/ /* Case: one move to succeed. */
+goalsList([on(b4, b1)]). /* Case: two moves to succeed. */
+/*goalsList([on(b4, b3), clear(b2)]).*/ /* Case: one move for first goal, one for second. */
+/*goalsList([on(b4, b3), clear(b3)]).*/ /* Case: second goal erases first one. */
 
 goal_achieved(Goal,State) :-
-    nonvar(Goal),
-    member(Goal,State).
+    /* "on" condition has always two instantiated members.*/
+    on(_, _) = Goal,
+    member(Goal, State).
 goal_achieved(Goal,State) :-
-    var(Goal),
-    clear(X/on(X, Y)) = Goal,
-    goal_achieved(Y, State).
+    clear(Element) = Goal,
+    atom(Element),
+    member(Goal, State).
+goal_achieved(Goal,State) :-
+    clear(Pair) = Goal,
+    \+ atom(Pair),
+    inst_pair(Pair, State, InstElem),
+    member(clear(InstElem), State).
 
 goals_achieved([],_).
 goals_achieved(Goals,State) :-
@@ -36,39 +47,33 @@ requires(Action, CondGoals, Conditions) :-
     move(X, Y, Z) = Action,
     nonvar(X),
     CondGoals = [clear(X), clear(Z)],
-    Conditions = on(X, Y).
+    Conditions = [on(X, Y)].
 requires(Action, CondGoals, Conditions) :-
     move(X, Y, Z) = Action,
     var(X),
     CondGoals = [clear(X/on(X, Y))],
     Conditions = [diff(X/on(X,Y), Z), clear(Z)].
 
-inst_conditon(Condition, State) :-
+/*inst_conditon(Condition, State) :-
     Condition = on(_, _),
     inst_on_condition(Condition, State).
 inst_conditon(Condition, State) :-
     Condition = clear(_),
-    inst_clear_condition(Condition, State).
+    inst_clear_condition(Condition, State).*/
 
-inst_pair(Pair, State) :-
+inst_pair(Pair, State, InstElem) :-
     X/on(X, Y) = Pair,
-    nonvar(Y),
-    member(on(X, Y), State),
-    Pair = X/on(X, Y).
-inst_pair(Pair, State) :-
+    atom(Y),
+    member(on(InstElem, Y), State).
+inst_pair(Pair, State, InstElem) :-
     X/on(X, NextPair) = Pair,
-    var(NextPair), /* as an assertion */
-    inst_pair(NextPair, State),
-    Z/_ = NextPair,
-    member(on(X, Z), State),
-    Pair = X/on(X, NextPair).
+    \+ atom(NextPair),
+    inst_pair(NextPair, State, NextElem),
+    member(on(InstElem, NextElem), State).
 
-inst_clear_cond_first_arg(Condition, _) :-
-    nonvar(Condition).
-inst_diff_cond_first_arg(Condition, State) :-
-    diff(X, Y) = Condition,
-    inst_pair(X, State),
-    Condition = diff(X, Y).
+inst_diff_cond_first_arg(Condition, State, InstFirstArg) :-
+    diff(X, _) = Condition,
+    inst_pair(X, State, InstFirstArg).
 
 find_different_clear(Clear1, Clear2, State) :-
     [X| _] = State,
@@ -79,26 +84,26 @@ find_different_clear(Clear1, Clear2, State) :-
     [_| Tail] = State,
     find_different_clear(Clear1, Clear2, Tail).
 
-inst_action(Action, _, State1, InstAction) :-
-    move(X, _, Z) = Action,
-    nonvar(X),
-    member(on(X, Y), State1),
-    InstAction = move(X, Y, Z).
 inst_action(Action, Conditions, State1, InstAction) :-
-    move(X, Y, Z) = Action,
-    var(X),
     /*
-     * If action is in "move from" type (to make clear), first conditon is always
-     * that moved element is different than its target position.
-     * Hence we can find moved element (find instance).
+     * If there is "on" condidion, move type is "move known element from unknown
+     * field".
      */
-    [Cond|_] = Conditions,
-    inst_diff_cond_first_arg(Cond, State1),
-    diff(Pair, _) = Cond,
-    X/_ = Pair,
-    /* Choose Z different than X. */
-    find_different_clear(X, Z, State1),
-    InstAction = move(X, Y, Z).
+    [on(A, B)] = Conditions,
+    member(on(A, B), State1),
+    move(X, _, Z) = Action,
+    InstAction = move(X, B, Z).
+inst_action(Action, Conditions, State1, InstAction) :-
+    /*
+     * If there are "diff" and clear conditions, move type is "move unknown
+     * from known element.
+     */
+    move(_, From, _) = Action,
+    [diff(A, B), clear(B)] = Conditions,
+    inst_diff_cond_first_arg(diff(A,B), State1, Moved),
+    /* Target have to be different than moved element and clear. */
+    find_different_clear(Moved, Target, State1),
+    InstAction = move(Moved, From, Target).
 
 perform_action(State1, InstAction, State2) :-
     move(X, Y, Z) = InstAction,
