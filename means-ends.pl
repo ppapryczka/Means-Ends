@@ -1,10 +1,11 @@
 /* Lists for testing purpose: */
 initList([on(b1, p1), on(b2, b1), on(b3, p2), on(b4, p4), clear(b2), clear(b3), clear(p3), clear(b4)]).
-/*goalsList([clear(b1)]).*/ /* Case: one field clear. */
-/*goalsList([on(b4, b3)]).*/ /* Case: one move to succeed. */
-goalsList([on(b4, b1)]). /* Case: two moves to succeed. */
-/*goalsList([on(b4, b3), clear(b2)]).*/ /* Case: one move for first goal, one for second. */
-/*goalsList([on(b4, b3), clear(b3)]).*/ /* Case: second goal erases first one. */
+%! goalsList([clear(b1)]). /* Case: one move to succed. */
+%! goalsList([clear(p1)]). /* Case: two moves to succed. */
+%! goalsList([on(b4, b3)]). /* Case: one move to succeed. */
+%! goalsList([on(b4, b1)]). /* Case: two moves to succeed. */
+%! goalsList([on(b4, b3), clear(b2)]). /* Case: one move for first goal, second is alredy fulfilled. */
+goalsList([on(b4, b3), clear(b3)]). /* Case: second goal erases first one. */
 
 goal_achieved(Goal,State) :-
     /* "on" condition has always two instantiated members.*/
@@ -41,26 +42,23 @@ achieves(Goal, Action) :-
     Action = move(X, _, Y).
 achieves(Goal, Action) :-
     clear(X) = Goal,
-    Action = move(_, X, _).
+    Action = move(Elem/on(Elem, X), X, _).
 
 requires(Action, CondGoals, Conditions) :-
     move(X, Y, Z) = Action,
-    nonvar(X),
+    atom(X),
     CondGoals = [clear(X), clear(Z)],
     Conditions = [on(X, Y)].
 requires(Action, CondGoals, Conditions) :-
     move(X, Y, Z) = Action,
-    var(X),
-    CondGoals = [clear(X/on(X, Y))],
-    Conditions = [diff(X/on(X,Y), Z), clear(Z)].
+    \+ atom(X),
+    CondGoals = [clear(X)],
+    Conditions = [diff(X, Z), clear(Z)].
 
-/*inst_conditon(Condition, State) :-
-    Condition = on(_, _),
-    inst_on_condition(Condition, State).
-inst_conditon(Condition, State) :-
-    Condition = clear(_),
-    inst_clear_condition(Condition, State).*/
-
+inst_pair(Pair, _, InstElem) :-
+    /* Not realy pair, but simpifies code a lot. */
+    atom(Pair),
+    InstElem = Pair.
 inst_pair(Pair, State, InstElem) :-
     X/on(X, Y) = Pair,
     atom(Y),
@@ -98,8 +96,9 @@ inst_action(Action, Conditions, State1, InstAction) :-
      * If there are "diff" and clear conditions, move type is "move unknown
      * from known element.
      */
-    move(_, From, _) = Action,
+    move(_, FromUninst, _) = Action,
     [diff(A, B), clear(B)] = Conditions,
+    inst_pair(FromUninst, State1, From),
     inst_diff_cond_first_arg(diff(A,B), State1, Moved),
     /* Target have to be different than moved element and clear. */
     find_different_clear(Moved, Target, State1),
@@ -129,6 +128,7 @@ plan(InitState, Goals, Plan, FinalState) :-
     plan(State2, RestGoals, PostPlan, FinalState),
     append(PrePlan, [ InstAction | PostPlan ], Plan).
 
+/* Function exists only for easier test running. */
 run(Plan, FinalState) :-
     initList(InitState),
     goalsList(Goals),
