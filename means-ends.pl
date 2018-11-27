@@ -5,16 +5,17 @@ initList([on(b1, p1), on(b2, b1), on(b3, p2), on(b4, p4), clear(b2), clear(b3), 
 %! goalsList([on(b4, b3)]). /* Case: one move to succeed. */
 %! goalsList([on(b4, b1)]). /* Case: two moves to succeed. */
 %! goalsList([on(b4, b3), clear(b2)]). /* Case: one move for first goal, second is alredy fulfilled. */
-goalsList([on(b4, b3), clear(b3)]). /* Case: second goal erases first one. */
+%! goalsList([on(b4, b3), clear(b3)]). /* Case: second goal erases first one. */
+goalsList([on(b4, b3), clear(b1)]). /* Case: second goal erases first one. */
 
+goal_achieved(clear(X/Y),State) :-
+    !, goal_achieved(Y, State),
+    member(clear(X), State).
+goal_achieved(on(X, Y/Z),State) :-
+    !, goal_achieved(Z, State),
+    member(on(X,Y), State).
 goal_achieved(Goal,State) :-
-    /* "on" condition has always two instantiated members.*/
-    on(_, _) = Goal,
     member(Goal, State).
-goal_achieved(Goal,State) :-
-    clear(Pair) = Goal,
-    inst_elem(Pair, State, InstElem),
-    member(clear(InstElem), State).
 
 goals_achieved([],_).
 goals_achieved(Goals,State) :-
@@ -23,30 +24,19 @@ goals_achieved(Goals,State) :-
     goals_achieved(Tail,State).
 
 choose_goal(Goal, Goals, RestGoals, InitState) :-
-    [Goal| Tail] = Goals,
+    member(Goal, Goals),
     not(goal_achieved(Goal, InitState)),
-    RestGoals = Tail.
-choose_goal(Goal, Goals, RestGoals, InitState) :-
-    [X| Tail] = Goals,
-    goal_achieved(X, InitState),
-    choose_goal(Goal, Tail, TailRest, InitState),
-    append([X], TailRest, RestGoals).
+    delete(Goals, Goal, RestGoals).
 
-achieves(Goal, Action) :-
-    on(X, Y) = Goal,
-    Action = move(X, _, Y).
-achieves(Goal, Action) :-
-    clear(X) = Goal,
-    Action = move(Elem/on(Elem, X), X, _).
+achieves(on(X, Y), move(X, _, Y)).
+achieves(clear(X), move(Elem/on(Elem, X), X, _)).
 
-requires(Action, CondGoals, Conditions) :-
-    move(X, Y, Z) = Action,
+requires(move(X, Y, Z), CondGoals, Conditions) :-
     atom(X),
     CondGoals = [clear(X), clear(Z)],
     Conditions = [on(X, Y)].
-requires(Action, CondGoals, Conditions) :-
-    move(X, Y, Z) = Action,
-    \+ atom(X),
+requires(move(X, _, Z), CondGoals, Conditions) :-
+    %! \+ atom(X),
     CondGoals = [clear(X)],
     Conditions = [diff(X, Z), clear(Z)].
 
@@ -62,15 +52,6 @@ inst_elem(Pair, State, InstElem) :-
     \+ atom(NextPair),
     inst_elem(NextPair, State, NextElem),
     member(on(InstElem, NextElem), State).
-
-find_different_clear(Clear1, Clear2, State) :-
-    [X| _] = State,
-    X = clear(Place),
-    not(Place == Clear1),
-    Clear2 = Place.
-find_different_clear(Clear1, Clear2, State) :-
-    [_| Tail] = State,
-    find_different_clear(Clear1, Clear2, Tail).
 
 inst_action(Action, Conditions, State1, InstAction) :-
     /*
@@ -91,18 +72,18 @@ inst_action(Action, Conditions, State1, InstAction) :-
     inst_elem(FromUninst, State1, From),
     inst_elem(MovedUninst, State1, Moved),
     /* Target have to be different than moved element and clear. */
-    find_different_clear(Moved, Target, State1),
+    member(clear(Target), State1),
+    \+ (Target == Moved),
     InstAction = move(Moved, From, Target).
 
 perform_action(State1, InstAction, State2) :-
     move(X, Y, Z) = InstAction,
     /* Moved element is still clear - do nothing with it */
     /* Source element should be cleared: */
-    append(State1, [clear(Y)], StateA),
-    delete(StateA, on(X, Y), StateB),
+    delete(State1, on(X, Y), StateA),
     /* Target shoud be "uncleared", and moved element should be on target: */
-    delete(StateB, clear(Z), StateC),
-    append(StateC, [on(X, Z)], State2).
+    delete(StateA, clear(Z), StateB),
+    [[clear(Y), on(X, Z)]| StateB] = State2.
 
 
 plan(State, Goals, [  ], State) :-
