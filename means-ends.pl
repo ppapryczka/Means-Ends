@@ -1,12 +1,20 @@
 /* Lists for testing purpose: */
 initList([on(b1, p1), on(b2, b1), on(b3, p2), on(b4, p4), clear(b2), clear(b3), clear(p3), clear(b4)]).
-%! goalsList([clear(b1)]). /* Case: one move to succed. */
+goalsList([clear(b1)]). /* Case: one move to succed. */
 %! goalsList([clear(p1)]). /* Case: two moves to succed. */
 %! goalsList([on(b4, b3)]). /* Case: one move to succeed. */
 %! goalsList([on(b4, b1)]). /* Case: two moves to succeed. */
 %! goalsList([on(b4, b3), clear(b2)]). /* Case: one move for first goal, second is alredy fulfilled. */
 %! goalsList([on(b4, b3), clear(b3)]). /* Case: second goal erases first one. */
-goalsList([on(b4, b3), clear(b1)]). /* Case: second goal erases first one. */
+%! goalsList([on(b4, b3), clear(b1)]). /* Case: second goal erases first one. */
+
+%! engine start
+
+delete_member(X, [X|R], R).
+delete_member(X, [Y|R], [Y|R1]) :-
+    delete_member(X, R, R1).
+
+%! engine end
 
 goal_achieved(clear(X/Y),State) :-
     !, goal_achieved(Y, State),
@@ -24,9 +32,8 @@ goals_achieved(Goals,State) :-
     goals_achieved(Tail,State).
 
 choose_goal(Goal, Goals, RestGoals, InitState) :-
-    member(Goal, Goals),
-    not(goal_achieved(Goal, InitState)),
-    delete(Goals, Goal, RestGoals).
+    delete_member(Goal, Goals, RestGoals),
+    not(goal_achieved(Goal, InitState)).
 
 achieves(on(X, Y), move(X, _, Y)).
 achieves(clear(X), move(Elem/on(Elem, X), X, _)).
