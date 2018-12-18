@@ -35,53 +35,31 @@ choose_goal(Goal, Goals, RestGoals, InitState) :-
     delete_member(Goal, Goals, RestGoals),
     not(goal_achieved(Goal, InitState)).
 
-achieves(on(X, Y), move(X, _, Y)).
-achieves(clear(X), move(Elem/on(Elem, X), X, _)).
+achieves(on(X, Z), move(X, _, Z)).
+achieves(clear(Y), move(_, Y, _)).
 
 requires(move(X, Y, Z), CondGoals, Conditions) :-
-    atom(X),
+    nonvar(X),
+    !,
     CondGoals = [clear(X), clear(Z)],
     Conditions = [on(X, Y)].
-requires(move(X, _, Z), CondGoals, Conditions) :-
-    %! \+ atom(X),
-    CondGoals = [clear(X)],
+requires(move(X, Y, Z), CondGoals, Conditions) :-
+    CondGoals = [clear(X/on(X, Y))],
     Conditions = [diff(X, Z), clear(Z)].
 
-inst_elem(Pair, _, InstElem) :-
-    atom(Pair),
-    InstElem = Pair.
-inst_elem(Pair, State, InstElem) :-
-    X/on(X, Y) = Pair,
-    atom(Y),
-    member(on(InstElem, Y), State).
-inst_elem(Pair, State, InstElem) :-
-    X/on(X, NextPair) = Pair,
-    \+ atom(NextPair),
-    inst_elem(NextPair, State, NextElem),
-    member(on(InstElem, NextElem), State).
+inst_move(move(X, Y/_, Z), move(X, Y, Z)) :-
+    !.
+inst_move(Action, Action).
 
-inst_action(Action, Conditions, State1, InstAction) :-
-    /*
-     * If there is "on" condidion, move type is "move known element from unknown
-     * field".
-     */
-    [on(A, B)] = Conditions,
-    member(on(A, B), State1),
-    move(X, _, Z) = Action,
-    InstAction = move(X, B, Z).
-inst_action(Action, Conditions, State1, InstAction) :-
-    /*
-     * If there are "diff" and clear conditions, move type is "move unknown
-     * from known element.
-     */
-    [diff(_, B), clear(B)] = Conditions,
-    move(MovedUninst, FromUninst, _) = Action,
-    inst_elem(FromUninst, State1, From),
-    inst_elem(MovedUninst, State1, Moved),
-    /* Target have to be different than moved element and clear. */
-    member(clear(Target), State1),
-    \+ (Target == Moved),
-    InstAction = move(Moved, From, Target).
+inst_action(Action, [on(X, Y)], State, InstAction) :-
+    member(on(X, Y), State),
+    InstAction = Action.
+inst_action(Action, [diff(X, Z), clear(Z)], [clear(A)| StateTail], InstAction) :-
+    A \= X,
+    Z = A,
+    inst_move(Action, InstAction).
+inst_action(Action, [diff(X, Z), clear(Z)], [_| StateTail], InstAction) :-
+    inst_action(Action, [diff(X, Z), clear(Z)], StateTail, InstAction).
 
 perform_action(State1, InstAction, State2) :-
     move(X, Y, Z) = InstAction,
@@ -90,7 +68,7 @@ perform_action(State1, InstAction, State2) :-
     delete(State1, on(X, Y), StateA),
     /* Target shoud be "uncleared", and moved element should be on target: */
     delete(StateA, clear(Z), StateB),
-    [[clear(Y), on(X, Z)]| StateB] = State2.
+    [clear(Y)| [on(X, Z)| StateB]] = State2.
 
 
 plan(State, Goals, [  ], State) :-
