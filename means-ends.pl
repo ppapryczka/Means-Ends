@@ -54,7 +54,7 @@ inst_move(Action, Action).
 inst_action(Action, [on(X, Y)], State, InstAction) :-
     member(on(X, Y), State),
     InstAction = Action.
-inst_action(Action, [diff(X, Z), clear(Z)], [clear(A)| StateTail], InstAction) :-
+inst_action(Action, [diff(X, Z), clear(Z)], [clear(A)| _], InstAction) :-
     A \= X,
     Z = A,
     inst_move(Action, InstAction).
@@ -70,9 +70,10 @@ perform_action(State1, InstAction, State2) :-
     delete(StateA, clear(Z), StateB),
     [clear(Y)| [on(X, Z)| StateB]] = State2.
 
-set_preLimit(_, Limit, Limit).
-set_preLimit(Max, Max, Max) :-
+set_preLimit(Max, Limit, _) :-
+    Max =< Limit,
     !, fail.
+set_preLimit(_, Limit, Limit).
 set_preLimit(Max, Limit, Result) :-
     NewLimit is Limit + 1,
     set_preLimit(Max, NewLimit, Result).
@@ -80,9 +81,9 @@ set_preLimit(Max, Limit, Result) :-
 plan(State, Goals, _, [  ], State) :-
     goals_achieved(Goals, State).
 plan(_, _, 0, _, _) :-
-    fail.
+    !, fail.
 plan(InitState, Goals, Limit, Plan, FinalState) :-
-    set_preLimit(Limit, 1, PreLimit),
+    set_preLimit(Limit, 0, PreLimit),
     choose_goal(Goal, Goals, RestGoals, InitState),
     achieves(Goal, Action),
     requires(Action, CondGoals, Conditions),
