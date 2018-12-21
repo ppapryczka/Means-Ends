@@ -70,22 +70,31 @@ perform_action(State1, InstAction, State2) :-
     delete(StateA, clear(Z), StateB),
     [clear(Y)| [on(X, Z)| StateB]] = State2.
 
+set_preLimit(_, Limit, Limit).
+set_preLimit(Max, Max, Max) :-
+    !, fail.
+set_preLimit(Max, Limit, Result) :-
+    NewLimit is Limit + 1,
+    set_preLimit(Max, NewLimit, Result).
 
-plan(State, Goals, [  ], State) :-
+plan(State, Goals, _, [  ], State) :-
     goals_achieved(Goals, State).
-
-plan(InitState, Goals, Plan, FinalState) :-
+plan(_, _, 0, _, _) :-
+    fail.
+plan(InitState, Goals, Limit, Plan, FinalState) :-
+    set_preLimit(Limit, 1, PreLimit),
     choose_goal(Goal, Goals, RestGoals, InitState),
     achieves(Goal, Action),
     requires(Action, CondGoals, Conditions),
-    plan(InitState, CondGoals, PrePlan, State1),
+    plan(InitState, CondGoals, PreLimit, PrePlan, State1),
     inst_action(Action, Conditions, State1, InstAction),
     perform_action(State1, InstAction, State2),
-    plan(State2, RestGoals, PostPlan, FinalState),
+    PostLimit is Limit - PreLimit - 1,
+    plan(State2, RestGoals, PostLimit, PostPlan, FinalState),
     append(PrePlan, [ InstAction | PostPlan ], Plan).
 
 /* Function exists only for easier test running. */
-run(Plan, FinalState) :-
+run(Limit,Plan, FinalState) :-
     initList(InitState),
     goalsList(Goals),
-    plan(InitState, Goals, Plan, FinalState).
+    plan(InitState, Goals, Limit, Plan, FinalState).
