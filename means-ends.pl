@@ -1,9 +1,9 @@
 /* Lists for testing purpose: */
 initList([on(b1, p1), on(b2, b1), on(b3, p2), on(b4, p4), clear(b2), clear(b3), clear(p3), clear(b4)]).
 %! goalsList([clear(b1)]). /* Case: one move to succed. */
-%! goalsList([clear(p1)]). /* Case: two moves to succed. */
+ goalsList([clear(p1)]). /* Case: two moves to succed. */
 %! goalsList([on(b4, b3)]). /* Case: one move to succeed. */
- goalsList([on(b4, b1)]). /* Case: two moves to succeed. */
+%! goalsList([on(b4, b1)]). /* Case: two moves to succeed. */
 %! goalsList([on(b4, b3), clear(b2)]). /* Case: one move for first goal, second is alredy fulfilled. */
 %! goalsList([on(b4, b3), clear(b3)]). /* Case: second goal erases first one. */
 
@@ -87,8 +87,39 @@ check_action(Action, [_ | RestGoals]) :-
 
 add_goal_achieved(on(X, Y), AchievedSoFar, [on(X, Y) | AchievedSoFar]).
 add_goal_achieved(clear(X/_), AchievedSoFar, [clear(X) | AchievedSoFar]) :-
-	!.
+    !.
 add_goal_achieved(clear(X), AchievedSoFar, [clear(X) | AchievedSoFar]).
+
+possible_action(Action, Conditions, State, ActionList) :-
+    findall(InstAction, inst_action(Action, Conditions, State, InstAction), ActionList).
+
+check_decision(X, ListLen, X) :-
+   number(X),
+   X =< ListLen,
+   !.
+check_decision(c, _, c) :-
+   !.
+check_decision(_, ListLen, Dec) :-
+   write("Wrong argument, try again."),
+   read_decision(Dec,ListLen).
+
+read_decision(X, ListLen) :-
+    read(Val),
+    check_decision(Val, ListLen, X).
+
+make_decision(c, _, _) :-
+    !, fail.
+make_decision(Num, ActionList, Action) :-
+    nth1(Num, ActionList, Action).
+
+choose_action(State, ActionList, InstAction) :-
+    write("State: "),
+    write(State), nl,
+    write("ActionList: "),
+    write(ActionList), nl,
+    length(ActionList, ListLen),
+    read_decision(Decision, ListLen),
+    make_decision(Decision, ActionList, InstAction).
 
 plan(State, Goals, _,  _, [  ], State) :-
     goals_achieved(Goals, State),
@@ -101,7 +132,8 @@ plan(InitState, Goals, AchievedGoals, Limit, Plan, FinalState) :-
     achieves(Goal, Action),
     requires(Action, CondGoals, Conditions),
     plan(InitState, CondGoals, AchievedGoals, PreLimit, PrePlan, State1),
-    inst_action(Action, Conditions, State1, InstAction),
+    possible_action(Action, Conditions, State1, ActionList),
+    choose_action(State1, ActionList, InstAction),
     check_action(InstAction, AchievedGoals),
     perform_action(State1, InstAction, State2),
     add_goal_achieved(Goal, AchievedGoals, AchievedGoals1),
