@@ -72,7 +72,9 @@ perform_action(State1, InstAction, State2) :-
 set_preLimit(Max, Limit, _) :-
     Max =< Limit,
     !, fail.
-set_preLimit(_, Limit, Limit).
+/*set_preLimit(Max, Limit, Limit) :-
+     Max > Limit.*/
+set_preLimit(Max, Limit, Limit).
 set_preLimit(Max, Limit, Result) :-
     NewLimit is Limit + 1,
     set_preLimit(Max, NewLimit, Result).
@@ -96,6 +98,7 @@ plan(State, Goals, _,  _, [  ], State) :-
 plan(_, _, _, 0, _, _) :-
     !, fail.
 plan(InitState, Goals, AchievedGoals, Limit, Plan, FinalState) :-
+	Limit >= 0,
     set_preLimit(Limit, 0, PreLimit),
     choose_goal(Goal, Goals, RestGoals, InitState),
     achieves(Goal, Action),
@@ -109,8 +112,12 @@ plan(InitState, Goals, AchievedGoals, Limit, Plan, FinalState) :-
     plan(State2, RestGoals, AchievedGoals1, PostLimit, PostPlan, FinalState),
     append(PrePlan, [ InstAction | PostPlan ], Plan).
 
+plan_wraper(InitState, Goals, Limit, MaxLimit, Plan, FinalState) :-
+    set_preLimit(MaxLimit, Limit, GivenLimit),
+    plan(InitState, Goals, [], GivenLimit, Plan, FinalState).
+
 /* Function exists only for easier test running. */
-run(Limit,Plan, FinalState) :-
+run(Limit, MaxLimit, Plan, FinalState) :-
     initList(InitState),
     goalsList(Goals),
-    plan(InitState, Goals, [], Limit, Plan, FinalState).
+    plan_wraper(InitState, Goals, Limit, MaxLimit, Plan, FinalState).
