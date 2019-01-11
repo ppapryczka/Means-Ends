@@ -1,11 +1,11 @@
 /* Lists for testing purpose: */
 initList([on(b1, p1), on(b2, b1), on(b3, p2), on(b4, p4), clear(b2), clear(b3), clear(p3), clear(b4)]).
 %! goalsList([clear(b1)]). /* Case: one move to succed. */
- goalsList([clear(p1)]). /* Case: two moves to succed. */
+%! goalsList([clear(p1)]). /* Case: two moves to succed. */
 %! goalsList([on(b4, b3)]). /* Case: one move to succeed. */
 %! goalsList([on(b4, b1)]). /* Case: two moves to succeed. */
 %! goalsList([on(b4, b3), clear(b2)]). /* Case: one move for first goal, second is alredy fulfilled. */
-%! goalsList([on(b4, b3), clear(b3)]). /* Case: second goal erases first one. */
+ goalsList([on(b4, b3), clear(b3)]). /* Case: second goal erases first one. */
 
 %! engine start
 
@@ -71,6 +71,8 @@ perform_action(State1, InstAction, State2) :-
 
 set_preLimit(Max, Limit, _) :-
     Max =< Limit,
+    write("Fail: out of limit.\n"),
+    flush_output(),
     !, fail.
 set_preLimit(_, Limit, Limit).
 set_preLimit(Max, Limit, Result) :-
@@ -79,9 +81,15 @@ set_preLimit(Max, Limit, Result) :-
 
 check_action(_, []).
 check_action(move(_, _, Z), [clear(Z) | _]) :-
-    !, fail.
+    !,
+    write("Fail: ereasing previoulsy achieved goal.\n"),
+    flush_output(),
+    ,fail.
 check_action(move(X, _, _), [on(X, _) | _]) :-
-    !, fail.
+    !,
+    write("Fail: ereasing previoulsy achieved goal.\n"),
+    flush_output(),
+    fail.
 check_action(Action, [_ | RestGoals]) :-
     check_action(Action, RestGoals).
 
@@ -95,12 +103,12 @@ possible_action(Action, Conditions, State, ActionList) :-
 
 check_decision(X, ListLen, X) :-
    number(X),
-   X =< ListLen,
-   !.
+   X =< ListLen.
 check_decision(c, _, c) :-
    !.
 check_decision(_, ListLen, Dec) :-
-   write("Wrong argument, try again."),
+   write("Wrong argument, try again.\n"),
+   flush_output(),
    read_decision(Dec,ListLen).
 
 read_decision(X, ListLen) :-
@@ -125,6 +133,8 @@ plan(State, Goals, _,  _, [  ], State) :-
     goals_achieved(Goals, State),
     !.
 plan(_, _, _, 0, _, _) :-
+    write("Fail: out of limit.\n"),
+    flush_output(),
     !, fail.
 plan(InitState, Goals, AchievedGoals, Limit, Plan, FinalState) :-
     set_preLimit(Limit, 0, PreLimit),
