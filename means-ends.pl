@@ -129,34 +129,128 @@ choose_action(State, ActionList, InstAction) :-
     read_decision(Decision, ListLen),
     make_decision(Decision, ActionList, InstAction).
 
-plan(State, Goals, _,  _, [  ], State) :-
+plan(State, Goals, _,  _, [  ], State, Level) :-
+    my_trace_rec(1, plan, 1, Level, ['State'/State, 'Goals'/Goals]),
     goals_achieved(Goals, State),
+    my_trace_rec(4, plan, 1, Level, ['State'/State, 'Goals'/Goals]),
     !.    
-plan(_, _, _, 0, _, _) :-
+plan(_, _, _, 0, _, _, Level) :-
+    my_trace_rec(1, plan, 1, Level, ['Limit'/0]),
     write("Fail: out of limit.\n"),
     flush_output(),
     !, fail.
-plan(InitState, Goals, AchievedGoals, Limit, Plan, FinalState) :-
+plan(InitState, Goals, AchievedGoals, Limit, Plan, FinalState, Level) :-
+    my_trace_rec(1, plan, 3, Level, ['InitState'/InitState, 'Goals'/Goals, 'AchievedGoals'/AchievedGoals, 'Limit'/Limit, 'Plan'/Plan, 'FinalState'/FinalState]),  
+    NextLevel is Level + 1,
+    
+    my_trace_rec(2, plan, 3, Level, set_preLimit),  
     set_preLimit(Limit, 0, PreLimit),
+    my_trace_rec(3, plan, 3, Level, set_preLimit, ['PreLimit'/PreLimit]),  
+    
+    my_trace_rec(2, plan, 3, Level, choose_goal),  
     choose_goal(Goal, Goals, RestGoals, InitState),
+    my_trace_rec(3, plan, 3, Level, choose_goal, ['Goal'/Goal, 'RestGoals'/RestGoals]),  
+    
+    my_trace_rec(2, plan, 3, Level, achieves),
     achieves(Goal, Action),
+    my_trace_rec(3, plan, 3, Level, achieves, ['Action'/Action]),
+    
+    my_trace_rec(2, plan, 3, Level, requires),
     requires(Action, CondGoals, Conditions),
-    plan(InitState, CondGoals, AchievedGoals, PreLimit, PrePlan, State1),
+    my_trace_rec(3, plan, 3, Level, requires, ['CondGoals'/CondGoals, 'Conditions'/Conditions]),
+    
+    my_trace_rec(2, plan, 3, Level, plan),
+    plan(InitState, CondGoals, AchievedGoals, PreLimit, PrePlan, State1, NextLevel),
+    my_trace_rec(3, plan, 3, Level, plan, ['State1'/State1, 'PrePlan'/PrePlan]),
+    
+    my_trace_rec(2, plan, 3, Level, possible_action),
     possible_action(Action, Conditions, State1, ActionList),
+    my_trace_rec(3, plan, 3, Level, possible_action, ['ActionLinst'/ActionList]),
+    
+    my_trace_rec(2, plan, 3, Level, choose_action),
     choose_action(State1, ActionList, InstAction),
+    my_trace_rec(3, plan, 3, Level, choose_action, ['InstAction'/InstAction]),
+    
     check_action(InstAction, AchievedGoals),
+    
+    my_trace_rec(2, plan, 3, Level, perform_action),
     perform_action(State1, InstAction, State2),
+    my_trace_rec(3, plan, 3, Level, perform_action, ['State'/State2]),
+    
+    my_trace_rec(2, plan, 3, Level, add_goal_achieved),
     add_goal_achieved(Goal, AchievedGoals, AchievedGoals1),
+    my_trace_rec(3, plan, 3, Level, add_goal_achieved, ['AchievedGoals1'/AchievedGoals1]),
+    
     PostLimit is Limit - PreLimit - 1,
-    plan(State2, RestGoals, AchievedGoals1, PostLimit, PostPlan, FinalState),
-    append(PrePlan, [ InstAction | PostPlan ], Plan).
+ 
+    my_trace_rec(2, plan, 3, Level, plan),
+    plan(State2, RestGoals, AchievedGoals1, PostLimit, PostPlan, FinalState, NextLevel),
+    my_trace_rec(3, plan, 3, Level, plan, ['PostPlan'/PostPlan, 'FinalState'/FinalState]),
+    
+    my_trace_rec(2, plan, 3, Level, append),
+    append(PrePlan, [ InstAction | PostPlan ], Plan),
+    my_trace_rec(3, plan, 3, Level, ['Plan'/Plan]),
+    
+    my_trace_rec(4, plan, 3, Level, ['InitState'/InitState, 'Goals'/Goals, 'AchievedGoals'/AchievedGoals, 'Limit'/Limit, 'Plan'/Plan, 'FinalState'/FinalState]).
 
 plan_wraper(InitState, Goals, Limit, MaxLimit, Plan, FinalState) :-
+    my_trace_rec(1, plan_wraper, 1, 0, ['InitState'/InitState, 'Goals'/Goals, 'Limit'/Limit, 'MaxLimit'/MaxLimit, 'Plan'/Plan, 'FinalState'/FinalState]),  
     set_preLimit(MaxLimit, Limit, GivenLimit),
-    plan(InitState, Goals, [], GivenLimit, Plan, FinalState).
+    plan(InitState, Goals, [], GivenLimit, Plan, FinalState, 1).
 
 /* Function exists only for easier test running. */
 run(Limit, MaxLimit, Plan, FinalState) :-
     initList(InitState),
     goalsList(Goals),
     plan_wraper(InitState, Goals, Limit, MaxLimit, Plan, FinalState).
+    
+
+% procedure my_trace_rec
+
+% w celu wyprowadzenia wartosci zmiennych na wejeciu do procedury
+my_trace_rec(1,ProcName, Clause,Level, ArgList) :-
+	nl, nl, nl, write(ProcName),
+	write('   poziom   '), write(Level),
+	write('   klauzula   '), write(Clause),
+	write('   wejscie'),
+	write_args(ArgList), nl, read(_).
+% w celu wyprowadzenia komunikatu o wywołaniu innej procedury
+my_trace_rec(2,ProcName, Clause, Level, ProcName2) :-
+	nl, write(ProcName),
+	write('   poziom   '), write(Level),
+	write('   klauzula   '), write(Clause),
+	nl,write('wywołanie   '), write(ProcName2), nl.
+% w celu wyprowadzenia wartosci zmiennych po powrocie z innej procedury
+my_trace_rec(3,ProcName, Clause, Level,ProcName2, ArgList) :-
+	nl, write(ProcName),
+	write('   poziom   '), write(Level),
+	write('   klauzula   '), write(Clause),
+	nl,write('po wykonaniu   '), write(ProcName2),
+	write_args(ArgList), nl, read(_).
+% w celu wyprowadzenia wartosci zmiennych na zakończenie
+% wykonania procedury na danym poziomie rekurencji
+my_trace_rec(4,ProcName, Clause,Level, ArgList) :-
+	nl, write(ProcName),
+	write('   poziom   '), write(Level),
+	write('   klauzula   '), write(Clause),
+	nl,write('KONIEC WYKONANIA NA POZIOMIE  '),write(Level),
+	write_args(ArgList),
+	end_trace(Level, ProcName).
+
+end_trace(Level,ProcName)  :-
+	Level<2,
+	nl,  nl,  write('KONIEC SLEDZENIA  '), write(ProcName), nl, nl.
+end_trace(Level,_)  :-
+	Level >= 1,
+	nl, read(_).    
+
+
+write_args([]).
+write_args([First|Rest]) :-
+	write_one_arg(First),
+	write_args(Rest).
+write_one_arg(Name/Val)  :-
+	nl, write(Name), write('='), write(Val).
+
+
+% end my_trace_rec
