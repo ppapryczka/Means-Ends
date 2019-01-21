@@ -1,11 +1,11 @@
 /* Lists for testing purpose: */
 initList([on(b1, p1), on(b2, b1), on(b3, p2), on(b4, p4), clear(b2), clear(b3), clear(p3), clear(b4)]).
- goalsList([clear(b1)]). /* Case: one move to succed. */
+%! goalsList([clear(b1)]). /* Case: one move to succed. */
 %! goalsList([clear(p1)]). /* Case: two moves to succed. */
 %! goalsList([on(b4, b3)]). /* Case: one move to succeed. */
-%! goalsList([on(b4, b1)]). /* Case: two moves to succeed. */
+ goalsList([on(b4, b1)]). /* Case: two moves to succeed. */
 %! goalsList([on(b4, b3), clear(b2)]). /* Case: one move for first goal, second is alredy fulfilled. */
-%!goalsList([on(b4, b3), clear(b3)]). /* Case: second goal erases first one. */
+%goalsList([on(b4, b3), clear(b3)]). /* Case: second goal erases first one. */
 
 %! engine start
 
@@ -25,8 +25,7 @@ goal_achieved(Goal,State) :-
     member(Goal, State).
 
 goals_achieved([],_).
-goals_achieved(Goals,State) :-
-    [G|Tail] = Goals,
+goals_achieved([G|Tail],State) :-
     goal_achieved(G,State),
     goals_achieved(Tail,State).
 
@@ -37,37 +36,29 @@ choose_goal(Goal, Goals, RestGoals, InitState) :-
 achieves(on(X, Z), move(X, _, Z)).
 achieves(clear(Y), move(_, Y, _)).
 
-requires(move(X, Y, Z), CondGoals, Conditions) :-
+requires(move(X, Y, Z), [clear(X), clear(Z)], [on(X, Y)]) :-
     nonvar(X),
-    !,
-    CondGoals = [clear(X), clear(Z)],
-    Conditions = [on(X, Y)].
-requires(move(X, Y, Z), CondGoals, Conditions) :-
-    CondGoals = [clear(X/on(X, Y))],
-    Conditions = [diff(X, Z), clear(Z)].
+    !.
+requires(move(X, Y, Z), [clear(X/on(X, Y))], [diff(X, Z), clear(Z)]).
 
 inst_move(move(X, Y/_, Z), move(X, Y, Z)) :-
     !.
 inst_move(Action, Action).
 
-inst_action(Action, [on(X, Y)], State, InstAction) :-
-    member(on(X, Y), State),
-    InstAction = Action.
-inst_action(Action, [diff(X, Z), clear(Z)], [clear(A)| _], InstAction) :-
+inst_action(Action, [on(X, Y)], State, Action) :-
+    member(on(X, Y), State).
+inst_action(Action, [diff(X, A), clear(A)], [clear(A)| _], InstAction) :-
     A \= X,
-    Z = A,
     inst_move(Action, InstAction).
 inst_action(Action, [diff(X, Z), clear(Z)], [_| StateTail], InstAction) :-
     inst_action(Action, [diff(X, Z), clear(Z)], StateTail, InstAction).
 
-perform_action(State1, InstAction, State2) :-
-    move(X, Y, Z) = InstAction,
+perform_action(State1, move(X, Y, Z), [clear(Y)| [on(X, Z)| StateB]]) :-
     /* Moved element is still clear - do nothing with it */
     /* Source element should be cleared: */
     delete(State1, on(X, Y), StateA),
     /* Target shoud be "uncleared", and moved element should be on target: */
-    delete(StateA, clear(Z), StateB),
-    [clear(Y)| [on(X, Z)| StateB]] = State2.
+    delete(StateA, clear(Z), StateB).
 
 set_preLimit(Max, Limit, _) :-
     Max =< Limit,
@@ -133,7 +124,7 @@ plan(State, Goals, _,  _, [  ], State, Level) :-
     my_trace_rec(1, plan, 1, Level, ['State'/State, 'Goals'/Goals]),
     goals_achieved(Goals, State),
     my_trace_rec(4, plan, 1, Level, ['State'/State, 'Goals'/Goals]),
-    !.    
+    !.
 plan(_, _, _, 0, _, _, Level) :-
     my_trace_rec(1, plan, 1, Level, ['Limit'/0]),
     write("Fail: out of limit.\n"),
@@ -142,55 +133,55 @@ plan(_, _, _, 0, _, _, Level) :-
 plan(InitState, Goals, AchievedGoals, Limit, Plan, FinalState, Level) :-
     my_trace_rec(1, plan, 3, Level, ['InitState'/InitState, 'Goals'/Goals, 'AchievedGoals'/AchievedGoals, 'Limit'/Limit, 'Plan'/Plan, 'FinalState'/FinalState]),  
     NextLevel is Level + 1,
-    
-    my_trace_rec(2, plan, 3, Level, set_preLimit),  
+
+    my_trace_rec(2, plan, 3, Level, set_preLimit),
     set_preLimit(Limit, 0, PreLimit),
-    my_trace_rec(3, plan, 3, Level, set_preLimit, ['PreLimit'/PreLimit]),  
-    
-    my_trace_rec(2, plan, 3, Level, choose_goal),  
+    my_trace_rec(3, plan, 3, Level, set_preLimit, ['PreLimit'/PreLimit]),
+
+    my_trace_rec(2, plan, 3, Level, choose_goal),
     choose_goal(Goal, Goals, RestGoals, InitState),
-    my_trace_rec(3, plan, 3, Level, choose_goal, ['Goal'/Goal, 'RestGoals'/RestGoals]),  
-    
+    my_trace_rec(3, plan, 3, Level, choose_goal, ['Goal'/Goal, 'RestGoals'/RestGoals]),
+
     my_trace_rec(2, plan, 3, Level, achieves),
     achieves(Goal, Action),
     my_trace_rec(3, plan, 3, Level, achieves, ['Action'/Action]),
-    
+
     my_trace_rec(2, plan, 3, Level, requires),
     requires(Action, CondGoals, Conditions),
     my_trace_rec(3, plan, 3, Level, requires, ['CondGoals'/CondGoals, 'Conditions'/Conditions]),
-    
+
     my_trace_rec(2, plan, 3, Level, plan),
     plan(InitState, CondGoals, AchievedGoals, PreLimit, PrePlan, State1, NextLevel),
     my_trace_rec(3, plan, 3, Level, plan, ['State1'/State1, 'PrePlan'/PrePlan]),
-    
+
     my_trace_rec(2, plan, 3, Level, possible_action),
     possible_action(Action, Conditions, State1, ActionList),
     my_trace_rec(3, plan, 3, Level, possible_action, ['ActionLinst'/ActionList]),
-    
+
     my_trace_rec(2, plan, 3, Level, choose_action),
     choose_action(State1, ActionList, InstAction),
     my_trace_rec(3, plan, 3, Level, choose_action, ['InstAction'/InstAction]),
-    
+
     check_action(InstAction, AchievedGoals),
-    
+
     my_trace_rec(2, plan, 3, Level, perform_action),
     perform_action(State1, InstAction, State2),
     my_trace_rec(3, plan, 3, Level, perform_action, ['State'/State2]),
-    
+
     my_trace_rec(2, plan, 3, Level, add_goal_achieved),
     add_goal_achieved(Goal, AchievedGoals, AchievedGoals1),
     my_trace_rec(3, plan, 3, Level, add_goal_achieved, ['AchievedGoals1'/AchievedGoals1]),
-    
+
     PostLimit is Limit - PreLimit - 1,
- 
+
     my_trace_rec(2, plan, 3, Level, plan),
     plan(State2, RestGoals, AchievedGoals1, PostLimit, PostPlan, FinalState, NextLevel),
     my_trace_rec(3, plan, 3, Level, plan, ['PostPlan'/PostPlan, 'FinalState'/FinalState]),
-    
+
     my_trace_rec(2, plan, 3, Level, append),
     append(PrePlan, [ InstAction | PostPlan ], Plan),
-    my_trace_rec(3, plan, 3, Level, ['Plan'/Plan]),
-    
+    my_trace_rec(3, plan, 3, Level, append, ['Plan'/Plan]),
+
     my_trace_rec(4, plan, 3, Level, ['InitState'/InitState, 'Goals'/Goals, 'AchievedGoals'/AchievedGoals, 'Limit'/Limit, 'Plan'/Plan, 'FinalState'/FinalState]).
 
 plan_wraper(InitState, Goals, Limit, MaxLimit, Plan, FinalState) :-
@@ -203,7 +194,7 @@ run(Limit, MaxLimit, Plan, FinalState) :-
     initList(InitState),
     goalsList(Goals),
     plan_wraper(InitState, Goals, Limit, MaxLimit, Plan, FinalState).
-    
+
 
 % procedure my_trace_rec
 
@@ -213,7 +204,7 @@ my_trace_rec(1,ProcName, Clause,Level, ArgList) :-
 	write('   poziom   '), write(Level),
 	write('   klauzula   '), write(Clause),
 	write('   wejscie'),
-	write_args(ArgList), nl, read(_).
+	write_args(ArgList), nl.%, read(_).
 % w celu wyprowadzenia komunikatu o wywołaniu innej procedury
 my_trace_rec(2,ProcName, Clause, Level, ProcName2) :-
 	nl, write(ProcName),
@@ -226,7 +217,7 @@ my_trace_rec(3,ProcName, Clause, Level,ProcName2, ArgList) :-
 	write('   poziom   '), write(Level),
 	write('   klauzula   '), write(Clause),
 	nl,write('po wykonaniu   '), write(ProcName2),
-	write_args(ArgList), nl, read(_).
+	write_args(ArgList), nl.%, read(_).
 % w celu wyprowadzenia wartosci zmiennych na zakończenie
 % wykonania procedury na danym poziomie rekurencji
 my_trace_rec(4,ProcName, Clause,Level, ArgList) :-
@@ -242,7 +233,7 @@ end_trace(Level,ProcName)  :-
 	nl,  nl,  write('KONIEC SLEDZENIA  '), write(ProcName), nl, nl.
 end_trace(Level,_)  :-
 	Level >= 1,
-	nl, read(_).    
+	nl.%, read(_).
 
 
 write_args([]).
