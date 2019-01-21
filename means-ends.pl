@@ -1,11 +1,11 @@
 /* Lists for testing purpose: */
 initList([on(b1, p1), on(b2, b1), on(b3, p2), on(b4, p4), clear(b2), clear(b3), clear(p3), clear(b4)]).
-%! goalsList([clear(b1)]). /* Case: one move to succed. */
+ goalsList([clear(b1)]). /* Case: one move to succed. */
 %! goalsList([clear(p1)]). /* Case: two moves to succed. */
 %! goalsList([on(b4, b3)]). /* Case: one move to succeed. */
 %! goalsList([on(b4, b1)]). /* Case: two moves to succeed. */
 %! goalsList([on(b4, b3), clear(b2)]). /* Case: one move for first goal, second is alredy fulfilled. */
- goalsList([on(b4, b3), clear(b3)]). /* Case: second goal erases first one. */
+%!goalsList([on(b4, b3), clear(b3)]). /* Case: second goal erases first one. */
 
 %! engine start
 
@@ -84,7 +84,7 @@ check_action(move(_, _, Z), [clear(Z) | _]) :-
     !,
     write("Fail: ereasing previoulsy achieved goal.\n"),
     flush_output(),
-    ,fail.
+   fail.
 check_action(move(X, _, _), [on(X, _) | _]) :-
     !,
     write("Fail: ereasing previoulsy achieved goal.\n"),
@@ -131,7 +131,7 @@ choose_action(State, ActionList, InstAction) :-
 
 plan(State, Goals, _,  _, [  ], State) :-
     goals_achieved(Goals, State),
-    !.
+    !.    
 plan(_, _, _, 0, _, _) :-
     write("Fail: out of limit.\n"),
     flush_output(),
@@ -151,8 +151,12 @@ plan(InitState, Goals, AchievedGoals, Limit, Plan, FinalState) :-
     plan(State2, RestGoals, AchievedGoals1, PostLimit, PostPlan, FinalState),
     append(PrePlan, [ InstAction | PostPlan ], Plan).
 
+plan_wraper(InitState, Goals, Limit, MaxLimit, Plan, FinalState) :-
+    set_preLimit(MaxLimit, Limit, GivenLimit),
+    plan(InitState, Goals, [], GivenLimit, Plan, FinalState).
+
 /* Function exists only for easier test running. */
-run(Limit,Plan, FinalState) :-
+run(Limit, MaxLimit, Plan, FinalState) :-
     initList(InitState),
     goalsList(Goals),
-    plan(InitState, Goals, [], Limit, Plan, FinalState).
+    plan_wraper(InitState, Goals, Limit, MaxLimit, Plan, FinalState).
